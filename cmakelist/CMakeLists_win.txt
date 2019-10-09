@@ -1,0 +1,13 @@
+cmake_minimum_required(VERSION 3.14)
+project(keypointdemo)
+
+set(CMAKE_CXX_STANDARD 11)
+
+add_executable(keypoint src/demo11_1.cpp)
+
+#Opencv库
+set(OpenCV_DIR C:\\Programswin\\opencv\\mingw_build\\install)  #为window设置
+find_package(OpenCV REQUIRED)
+include_directories(${OpenCV_INCLUDE_DIRS})
+
+target_link_libraries(keypoint ${OpenCV_LIBS})
