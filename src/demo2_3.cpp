@@ -21,18 +21,37 @@ using namespace std;
 cv::Mat this_image, prev_image;//图片信息
 cv::Mat fast_image;
 vector<cv::Point2f> points_prev, points_this;//存储采集到的角点,上一帧、当前帧
+cv::TermCriteria termCriteria(cv::TermCriteria::MAX_ITER|cv::TermCriteria::EPS,20,0.03);//停止迭代标准
 double F_THRESHOLD = 1.0;
+//用于定义点排序
+bool compare(cv::KeyPoint a,cv::KeyPoint b){
+    return a.response > b.response;
+}
 //对传入的图片提取角点
-void getPoints(cv::Mat image,vector<cv::Point2f> &points,cv::InputArray mask=cv::noArray()){
+void getPoints(cv::Mat image,vector<cv::Point2f> &points,cv::InputArray mask=cv::noArray(),int maxConer= -1){
     vector<cv::KeyPoint> points_Fast; //暂时存储提取的点
     //Fast检测器
     cv::Ptr<cv::FastFeatureDetector> FastDetector = cv::FastFeatureDetector::create(20, true);
-    FastDetector -> detect(image, points_Fast,mask );
-    cv::KeyPointsFilter::retainBest(points_Fast,3);//取前3个特征点
-    // cv::cornerSubPix(this_image,points[1],cv::Size(10,10),cv::Size(-1,-1),termCriteria);
-    //点导入
-    for(auto kp:points_Fast)
-        points.push_back(kp.pt);
+    FastDetector -> detect(image, points_Fast,mask);
+    //按照响应值降序排序
+    sort(points_Fast.begin(),points_Fast.end(),compare);
+
+    /*决定导入点的数量
+     * maxConer > 0,按照maxConer导入
+     * maxConer = 0,不导入
+     * maxConer < 0,无限制
+     */
+
+    if (maxConer > 0){
+        for (int i = 0; i < maxConer; ++i) {
+            points.push_back(points_Fast[i].pt);
+        }
+    }
+    if (maxConer < 0){
+        for (auto kp:points_Fast)
+            points.push_back(kp.pt);
+    }
+
 }
 //去除追踪失败的点
 void reducePoints(vector<cv::Point2f> &v, vector<uchar> status)
@@ -73,7 +92,6 @@ int main(int argc, char** argv){
 
     //一些必要的数据
     cv::namedWindow("Fast",cv::WINDOW_AUTOSIZE);//创建一个显示窗口
-    cv::TermCriteria termCriteria(cv::TermCriteria::MAX_ITER|cv::TermCriteria::EPS,20,0.03);//停止迭代标准
 
     string dataset_path = argv[1];
     string dataset = dataset_path + "/file.txt";
@@ -93,11 +111,12 @@ int main(int argc, char** argv){
         cv::cvtColor(this_image, this_image, cv::COLOR_BGR2GRAY);
 
         //划分grid
-        int grid = 30;
+        int grid = 100;
         int width = this_image.cols;
         int height = this_image.rows;
         int n = width / grid; // 一行的grid数；
         int m = height / grid; // 一列的grid数
+        int num_point = 5;//每个grid的点数
 
         //第一帧提取角点
         if (isfrist){
@@ -107,14 +126,14 @@ int main(int argc, char** argv){
                     cv::Mat mask = cv::Mat::zeros(this_image.size(),CV_8UC1);
                     //每块grid检测，并选出最佳5个
                     mask.colRange(grid*i,grid*(i+1)).rowRange(grid*j,grid*(j+1)).setTo(255);
-                    getPoints(this_image,points_this,mask);
+                    getPoints(this_image,points_this,mask,num_point);
                 }
             }
             //grid之外的边缘区域,列边缘，行边缘
             cv::Mat mask = cv::Mat::zeros(this_image.size(),CV_8UC1);
             mask.colRange(grid*n ,width).setTo(255);
             mask.colRange(0,grid*n).rowRange(grid*m,height).setTo(255);
-            getPoints(this_image,points_this,mask);
+            getPoints(this_image,points_this,mask,num_point);
 
             //画出grid线条
             for (int i = 1; i <= n; ++i) {
@@ -129,14 +148,15 @@ int main(int argc, char** argv){
             for (int i = 0; i < points_this.size(); ++i) {
                 cv::circle(fast_image,points_this[i],3,cv::Scalar(0,255,0),-1,8);//画出点
             }
-
+            //亚像素角点精确化
+            cv::cornerSubPix(this_image,points_this,cv::Size(10,10),cv::Size(-1,-1),termCriteria);
             isfrist = false;
         }
             //后续进行光流追踪
         else{
             vector<uchar > status_Fast;
             vector<float > err_Fast;
-            cv::calcOpticalFlowPyrLK(prev_image,this_image,points_prev,points_this,status_Fast,err_Fast,cv::Size(10,10),3,termCriteria,0,0.001);
+            cv::calcOpticalFlowPyrLK(prev_image,this_image,points_prev,points_this,status_Fast,err_Fast,cv::Size(21,21),3,termCriteria,0,0.001);
             reducePoints(points_this,status_Fast);
             reducePoints(points_prev,status_Fast);
             rejectWithF(points_prev,points_this);//去除outlier
