@@ -1,4 +1,12 @@
 //
+// Created by XIANG on 2019/10/10.
+//
+/*
+ *更换补点方式
+ *采用vins思想
+ * fast角点
+ */
+//
 // Created by xiang on 2019/10/10.
 //
 /*
@@ -6,7 +14,6 @@
  * 加入outlier去除
  * 加入grid,grid划分版本2
  * 加入补点操作
- * 更改为Shi-Tomasi角点
  */
 
 #include <iostream>
@@ -19,9 +26,9 @@
 using namespace std;
 
 const int MAXCONER = 200;//最大角点数
+
 int grid = 100;//grid的size
 int num_point = 5;//每个grid的点数
-
 cv::Mat this_image, prev_image;//图片信息
 cv::Mat fast_image;
 vector<cv::Point2f> points_prev, points_this;//存储采集到的角点,上一帧、当前帧
@@ -35,9 +42,9 @@ bool compare(cv::KeyPoint a,cv::KeyPoint b){
 //对传入的图片提取角点
 void getPoints(cv::Mat image,vector<cv::Point2f> &points,cv::InputArray mask=cv::noArray(),int maxConer= -1){
     vector<cv::KeyPoint> points_Fast; //暂时存储提取的点
-    //GFTT检测器
-    cv::Ptr<cv::GFTTDetector> ShiDetector = cv::GFTTDetector::create(100, 0.01,30,3, false,0.04);
-    ShiDetector -> detect(image, points_Fast, mask);
+    //Fast检测器
+    cv::Ptr<cv::FastFeatureDetector> FastDetector = cv::FastFeatureDetector::create(20, true);
+    FastDetector -> detect(image, points_Fast,mask);
     //按照响应值降序排序
     sort(points_Fast.begin(),points_Fast.end(),compare);
 
@@ -61,9 +68,9 @@ void getPoints(cv::Mat image,vector<cv::Point2f> &points,cv::InputArray mask=cv:
 //对传入的图片提取角点,重载，KeyPoint版
 void getPoints(cv::Mat image,vector<cv::KeyPoint> &points,cv::InputArray mask=cv::noArray(),int maxConer= -1){
     vector<cv::KeyPoint> points_Fast; //暂时存储提取的点
-    //GFTT检测器
-    cv::Ptr<cv::GFTTDetector> ShiDetector = cv::GFTTDetector::create(100, 0.01,30,3, false,0.04);
-    ShiDetector -> detect(image, points_Fast, mask);
+    //Fast检测器
+    cv::Ptr<cv::FastFeatureDetector> FastDetector = cv::FastFeatureDetector::create(20, true);
+    FastDetector -> detect(image, points_Fast,mask);
     //按照响应值降序排序
     sort(points_Fast.begin(),points_Fast.end(),compare);
 
@@ -286,6 +293,3 @@ int main(int argc, char** argv){
     }
     return 0;
 }
-
-
-
