@@ -1,12 +1,13 @@
 //
-// Created by XIANG on 2019/10/10.
+// Created by xiang on 2019/10/10.
 //
 /*
- *更换补点方式
- *采用vins思想
- * fast角点
+ * 光流程序
+ * 加入outlier去除
+ * 加入grid,grid划分版本2
+ * 加入补点操作,补点方式二
+ * fast
  */
-
 
 #include <iostream>
 #include <fstream>
@@ -18,12 +19,11 @@
 using namespace std;
 
 const int MAXCONER = 200;//最大角点数
-const int MIN_DIST = 30;//点间距
 int grid = 100;//grid的size
 int num_point = 5;//每个grid的点数
+
 cv::Mat this_image, prev_image;//图片信息
 cv::Mat fast_image;
-
 vector<cv::Point2f> points_prev, points_this;//存储采集到的角点,上一帧、当前帧
 cv::TermCriteria termCriteria(cv::TermCriteria::MAX_ITER|cv::TermCriteria::EPS,20,0.03);//停止迭代标准
 double F_THRESHOLD = 1.0;
@@ -35,9 +35,9 @@ bool compare(cv::KeyPoint a,cv::KeyPoint b){
 //对传入的图片提取角点
 void getPoints(cv::Mat image,vector<cv::Point2f> &points,cv::InputArray mask=cv::noArray(),int maxConer= -1){
     vector<cv::KeyPoint> points_Fast; //暂时存储提取的点
-    //Fast检测器
-    cv::Ptr<cv::FastFeatureDetector> FastDetector = cv::FastFeatureDetector::create(20, true);
-    FastDetector -> detect(image, points_Fast,mask);
+    //fast检测器
+    cv::Ptr<cv::FastFeatureDetector> fastDetector = cv::FastFeatureDetector::create(20, true);
+    fastDetector -> detect(image, points_Fast, mask);
     //按照响应值降序排序
     sort(points_Fast.begin(),points_Fast.end(),compare);
 
@@ -61,9 +61,9 @@ void getPoints(cv::Mat image,vector<cv::Point2f> &points,cv::InputArray mask=cv:
 //对传入的图片提取角点,重载，KeyPoint版
 void getPoints(cv::Mat image,vector<cv::KeyPoint> &points,cv::InputArray mask=cv::noArray(),int maxConer= -1){
     vector<cv::KeyPoint> points_Fast; //暂时存储提取的点
-    //Fast检测器
-    cv::Ptr<cv::FastFeatureDetector> FastDetector = cv::FastFeatureDetector::create(20, true);
-    FastDetector -> detect(image, points_Fast,mask);
+    //GFTT检测器
+    cv::Ptr<cv::FastFeatureDetector> fastDetector = cv::FastFeatureDetector::create(20,true);
+    fastDetector -> detect(image, points_Fast, mask);
     //按照响应值降序排序
     sort(points_Fast.begin(),points_Fast.end(),compare);
 
@@ -202,16 +202,7 @@ void rejectWithF(vector<cv::Point2f> &points1,vector<cv::Point2f> &points2){
 
     }
 }
-//设置mask区域
-cv::Mat setmask(cv::Mat image,vector<cv::Point2f> points){
-    cv::Mat mask = cv::Mat(image.size(),CV_8UC1,cv::Scalar(255));
-    for (int i = 0; i < points.size(); ++i) {
-        if (mask.at<uchar >(points[i]) = 255){
-            cv::circle(mask,points[i],MIN_DIST,0,-1);
-        }
-    }
-    return mask;
-}
+
 
 
 int main(int argc, char** argv){
@@ -267,9 +258,7 @@ int main(int argc, char** argv){
             //补点操作
             int num_add = MAXCONER - points_this.size();
             if(num_add > 0){
-                cv::Mat mask = setmask(this_image,points_this);
-                getPoints(this_image,points_this,mask,num_add);
-//                cv::imshow("mask",mask);
+                getPoints_grid(this_image,grid,num_point,points_this);
             }
 
             if(points_this.size() == 0) {
@@ -297,3 +286,6 @@ int main(int argc, char** argv){
     }
     return 0;
 }
+
+
+
