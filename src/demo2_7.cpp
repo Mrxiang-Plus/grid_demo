@@ -235,7 +235,10 @@ int main(int argc, char** argv){
 
         //第一帧提取角点
         if (isfrist){
+            double start_frist = cv::getTickCount();
             getPoints_grid(this_image,grid,num_point,points_this);
+            double time_frsit = (cv::getTickCount() - start_frist) / (double)cv::getTickFrequency();
+            cout<<"time for frist image: "<<time_frsit<<endl;
             drawGrid(fast_image,grid);
 
             //在当前帧上画出角点
@@ -250,7 +253,10 @@ int main(int argc, char** argv){
         else{
             vector<uchar > status_Fast;
             vector<float > err_Fast;
+            double start_flow = cv::getTickCount();
             cv::calcOpticalFlowPyrLK(prev_image,this_image,points_prev,points_this,status_Fast,err_Fast,cv::Size(21,21),3,termCriteria,0,0.001);
+            double time_flow = (cv::getTickCount() - start_flow) / cv::getTickFrequency();
+            cout << "time for flow" << time_flow<<endl;
             reducePoints(points_this,status_Fast);
             reducePoints(points_prev,status_Fast);
             rejectWithF(points_prev,points_this);//去除outlier
@@ -258,7 +264,10 @@ int main(int argc, char** argv){
             //补点操作
             int num_add = MAXCONER - points_this.size();
             if(num_add > 0){
+                double start_add = cv::getTickCount();
                 getPoints_grid(this_image,grid,num_point,points_this);
+                double time_add = (cv::getTickCount() - start_add) / cv::getTickFrequency();
+                cout <<"time for add point: "<< time_add<<endl;
             }
 
             if(points_this.size() == 0) {

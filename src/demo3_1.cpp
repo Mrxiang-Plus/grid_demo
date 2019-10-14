@@ -244,7 +244,9 @@ int main(int argc, char** argv){
 
         //第一帧提取角点
         if (isfrist){
+            double start_frist = cv::getTickCount();
             getPoints_grid(this_image,grid,num_point,points_this);
+            double time_frsit = (cv::getTickCount() - start_frist) / (double)cv::getTickFrequency();
             drawGrid(fast_image,grid);
 
             //在当前帧上画出角点
@@ -254,12 +256,16 @@ int main(int argc, char** argv){
             //亚像素角点精确化
             cv::cornerSubPix(this_image,points_this,cv::Size(10,10),cv::Size(-1,-1),termCriteria);
             isfrist = false;
+            cout<<"time for frist image: "<<time_frsit<<endl;
         }
             //后续进行光流追踪
         else{
             vector<uchar > status_Fast;
             vector<float > err_Fast;
+            double start_flow = cv::getTickCount();
             cv::calcOpticalFlowPyrLK(prev_image,this_image,points_prev,points_this,status_Fast,err_Fast,cv::Size(21,21),3,termCriteria,0,0.001);
+            double time_flow = (cv::getTickCount() - start_flow) / cv::getTickFrequency();
+            cout << "time for flow" << time_flow<<endl;
             reducePoints(points_this,status_Fast);
             reducePoints(points_prev,status_Fast);
             rejectWithF(points_prev,points_this);//去除outlier
@@ -268,7 +274,10 @@ int main(int argc, char** argv){
             int num_add = MAXCONER - points_this.size();
             if(num_add > 0){
                 cv::Mat mask = setmask(this_image,points_this);
+                double start_add = cv::getTickCount();
                 getPoints(this_image,points_this,mask,num_add);
+                double time_add = (cv::getTickCount() - start_add) / cv::getTickFrequency();
+                cout <<"time for add point: "<< time_add<<endl;
 //                cv::imshow("mask",mask);
             }
 
