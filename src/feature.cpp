@@ -1,40 +1,25 @@
 //
 // Created by xiang on 2019/10/15.
 //
+#include "myslam/feature.h"
 
-/*
- *采用vins思想补点
- * fast角点
- * 加入最小距离限制
- */
-
-
-#include <iostream>
-#include <fstream>
-#include <opencv2/highgui/highgui.hpp>
-#include <opencv2/imgproc/imgproc.hpp>
-#include <opencv2/features2d/features2d.hpp>
-#include <opencv2/video/video.hpp>
-#include <opencv2/calib3d/calib3d.hpp>
 using namespace std;
 
-const int MAXCONER = 200;//最大角点数
-const int MIN_DIST = 30;//点间距
-int grid = 100;//grid的size
-int num_point = 5;//每个grid的点数
-cv::Mat this_image, prev_image;//图片信息
-cv::Mat fast_image;
-
-vector<cv::Point2f> points_prev, points_this;//存储采集到的角点,上一帧、当前帧
-cv::TermCriteria termCriteria(cv::TermCriteria::MAX_ITER|cv::TermCriteria::EPS,20,0.03);//停止迭代标准
-double F_THRESHOLD = 1.0;
-
-//用于定义点排序
-bool compare(cv::KeyPoint a,cv::KeyPoint b){
+//用于sort函数排序
+bool  compare(cv::KeyPoint a,cv::KeyPoint b){
     return a.response > b.response;
 }
-//对取的点按照最小距离进行筛选
-void minDistance(cv::Mat image, vector<cv::Point2f> &points, int minDistance=30,int maxCorners=1000){
+
+void reducePoints(vector<cv::Point2f> &v, vector<uchar> status)
+{
+    int j = 0;
+    for (int i = 0; i < int(v.size()); i++)
+        if (status[i])
+            v[j++] = v[i];
+    v.resize(j);
+}
+
+void minDistance(cv::Mat image, vector<cv::Point2f> &points, int minDistance,int maxCorners){
     size_t i, j, total = points.size(), ncorners = 0;
     vector<cv::Point2f> corners;
     if (minDistance >= 1)
@@ -125,8 +110,8 @@ void minDistance(cv::Mat image, vector<cv::Point2f> &points, int minDistance=30,
     points.clear();
     points = corners;
 }
-//对取的点按照最小距离进行筛选,重载
-void minDistance(cv::Mat image, vector<cv::KeyPoint> &points, int minDistance=30,int maxCorners=1000){
+
+void minDistance(cv::Mat image, vector<cv::KeyPoint> &points, int minDistance,int maxCorners){
     size_t i, j, total = points.size(), ncorners = 0;
     vector<cv::KeyPoint> corners;
     if (minDistance >= 1)
@@ -217,9 +202,9 @@ void minDistance(cv::Mat image, vector<cv::KeyPoint> &points, int minDistance=30
     points.clear();
     points = corners;
 }
-//对传入的图片提取角点
-void getPoints(cv::Mat image,vector<cv::Point2f> &points,cv::InputArray mask=cv::noArray(),int maxConer= -1){
-    vector<cv::KeyPoint> points_Fast; //暂时存储提取的点
+
+void getPoints(cv::Mat image,std::vector<cv::Point2f> &points,cv::InputArray mask,int maxConer){
+    std::vector<cv::KeyPoint> points_Fast; //暂时存储提取的点
     //Fast检测器
     cv::Ptr<cv::FastFeatureDetector> FastDetector = cv::FastFeatureDetector::create(20, true);
     FastDetector -> detect(image, points_Fast,mask);
@@ -250,8 +235,8 @@ void getPoints(cv::Mat image,vector<cv::Point2f> &points,cv::InputArray mask=cv:
 
 
 }
-//对传入的图片提取角点,重载，KeyPoint版
-void getPoints(cv::Mat image,vector<cv::KeyPoint> &points,cv::InputArray mask=cv::noArray(),int maxConer= -1){
+
+void getPoints(cv::Mat image,std::vector<cv::KeyPoint> &points,cv::InputArray mask,int maxConer){
     vector<cv::KeyPoint> points_Fast; //暂时存储提取的点
     //Fast检测器
     cv::Ptr<cv::FastFeatureDetector> FastDetector = cv::FastFeatureDetector::create(20, true);
@@ -283,8 +268,8 @@ void getPoints(cv::Mat image,vector<cv::KeyPoint> &points,cv::InputArray mask=cv
     }
 
 }
-//按照grid提取角点
-void getPoints_grid(cv::Mat image, int grid_size,int num_point_grid, vector<cv::Point2f> &points){
+
+void getPoints_grid(cv::Mat image, int grid_size,int num_point_grid, std::vector<cv::Point2f> &points){
     int width = image.cols;
     int height = image.rows;
     int n = width / grid_size; // 一行的grid数；
@@ -314,7 +299,7 @@ void getPoints_grid(cv::Mat image, int grid_size,int num_point_grid, vector<cv::
     mask.colRange(grid_size*n ,width).rowRange(grid_size*m,height).setTo(255);
     getPoints(image,points,mask,num_point_grid);
 }
-//按照grid提取角点,重载,加入总点数限制
+
 void getPoints_grid(cv::Mat image, int grid_size,int num_point_grid, vector<cv::Point2f> &points, int maxConer){
     int width = image.cols;
     int height = image.rows;
@@ -358,7 +343,27 @@ void getPoints_grid(cv::Mat image, int grid_size,int num_point_grid, vector<cv::
     }
 
 }
-//画出grid
+
+void rejectWithF(vector<cv::Point2f> &points1,vector<cv::Point2f> &points2 , double F_THRESHOLD){
+    vector<uchar> status;
+    if(points2.size() >= 8){
+        cv::findFundamentalMat(points1,points2,cv::FM_RANSAC,F_THRESHOLD ,0.99,status);
+        reducePoints(points1,status);
+        reducePoints(points2,status);
+
+    }
+}
+
+cv::Mat setmask(cv::Mat image,vector<cv::Point2f> points, double MIN_DIST){
+    cv::Mat mask = cv::Mat(image.size(),CV_8UC1,cv::Scalar(255));
+    for (int i = 0; i < points.size(); ++i) {
+        if (mask.at<uchar >(points[i]) = 255){
+            cv::circle(mask,points[i],MIN_DIST,0,-1);
+        }
+    }
+    return mask;
+}
+
 void drawGrid(cv::Mat &image, int grid_size){
     int width = image.cols;
     int height = image.rows;
@@ -373,16 +378,7 @@ void drawGrid(cv::Mat &image, int grid_size){
         cv::line(image,cv::Point2f(0,grid_size*i),cv::Point2f(width,grid_size*i),cv::Scalar(255,255,255));
     }
 }
-//去除追踪失败的点
-void reducePoints(vector<cv::Point2f> &v, vector<uchar> status)
-{
-    int j = 0;
-    for (int i = 0; i < int(v.size()); i++)
-        if (status[i])
-            v[j++] = v[i];
-    v.resize(j);
-}
-//画出轨迹
+
 void drawTrace(vector<cv::Point2f> &points1,vector<cv::Point2f> &points2,cv::Mat image){
     if(points1.size() != points2.size()) cout<<"wrong point number,can't draw trace"<<endl;
     else
@@ -391,117 +387,26 @@ void drawTrace(vector<cv::Point2f> &points1,vector<cv::Point2f> &points2,cv::Mat
             cv::circle(image, points2[i], 3, cv::Scalar(0, 255, 0), -1, 8);//画出点
         }
 }
-//去除outlier
-void rejectWithF(vector<cv::Point2f> &points1,vector<cv::Point2f> &points2){
-    vector<uchar> status;
-    if(points2.size() >= 8){
-        cv::findFundamentalMat(points1,points2,cv::FM_RANSAC,F_THRESHOLD,0.99,status);
-        reducePoints(points1,status);
-        reducePoints(points2,status);
 
+double getDepth(cv::Mat image_depth,cv::Point2f point, double depth_scale){
+    double d = image_depth.at<double >(point);
+    if ( d!=0 )
+    {
+        return d / depth_scale;
     }
-}
-//设置mask区域
-cv::Mat setmask(cv::Mat image,vector<cv::Point2f> points){
-    cv::Mat mask = cv::Mat(image.size(),CV_8UC1,cv::Scalar(255));
-    for (int i = 0; i < points.size(); ++i) {
-        if (mask.at<uchar >(points[i]) = 255){
-            cv::circle(mask,points[i],MIN_DIST,0,-1);
+    else
+    {
+        // check the nearby points
+        int dx[4] = {-1,0,1,0};
+        int dy[4] = {0,-1,0,1};
+        for ( int i=0; i<4; i++ )
+        {
+            d = image_depth.at<double >((point.x+dx[i] ),(point.y+dy[i]));
+            if ( d!=0 )
+            {
+                return d / depth_scale;
+            }
         }
     }
-    return mask;
-}
-
-
-int main(int argc, char** argv){
-    if(argc != 2){
-        cout<<"wrong input\nusage: grid path_to_dataset"<<endl;
-        return 1 ;
-    }
-
-    //一些必要的数据
-    cv::namedWindow("Fast",cv::WINDOW_AUTOSIZE);//创建一个显示窗口
-
-    string dataset_path = argv[1];
-    string dataset = dataset_path + "/file.txt";
-    bool isfrist = true;
-    int num = 0;
-    ifstream fin(dataset);//读取数据集文件
-
-
-    ///读取数据并进行处理
-    while(true){
-        string picture_file;//存储当前图片地址
-
-        fin >> picture_file;
-        if (fin.eof())   break;
-
-        this_image = cv::imread(picture_file);
-        this_image.copyTo(fast_image);
-        cv::cvtColor(this_image, this_image, cv::COLOR_BGR2GRAY);
-
-
-        //第一帧提取角点
-        if (isfrist){
-            double start_frist = cv::getTickCount();
-            getPoints_grid(this_image,grid,num_point,points_this);
-            double time_frsit = (cv::getTickCount() - start_frist) / (double)cv::getTickFrequency();
-            drawGrid(fast_image,grid);
-
-            //在当前帧上画出角点
-            for (int i = 0; i < points_this.size(); ++i) {
-                cv::circle(fast_image,points_this[i],3,cv::Scalar(0,255,0),-1,8);//画出点
-            }
-            //亚像素角点精确化
-            cv::cornerSubPix(this_image,points_this,cv::Size(10,10),cv::Size(-1,-1),termCriteria);
-            isfrist = false;
-            cout<<"time for frist image: "<<time_frsit<<endl;
-        }
-            //后续进行光流追踪
-        else{
-            vector<uchar > status_Fast;
-            vector<float > err_Fast;
-            double start_flow = cv::getTickCount();
-            cv::calcOpticalFlowPyrLK(prev_image,this_image,points_prev,points_this,status_Fast,err_Fast,cv::Size(21,21),3,termCriteria,0,0.001);
-            double time_flow = (cv::getTickCount() - start_flow) / cv::getTickFrequency();
-            cout << "time for flow" << time_flow<<endl;
-            reducePoints(points_this,status_Fast);
-            reducePoints(points_prev,status_Fast);
-            rejectWithF(points_prev,points_this);//去除outlier
-
-            //补点操作
-            int num_add = MAXCONER - points_this.size();
-            if(num_add > 0){
-                cv::Mat mask = setmask(this_image,points_this);
-                double start_add = cv::getTickCount();
-                getPoints(this_image,points_this,mask,num_add);
-                double time_add = (cv::getTickCount() - start_add) / cv::getTickFrequency();
-                cout <<"time for add point: "<< time_add<<endl;
-//                cv::imshow("mask",mask);
-            }
-
-            if(points_this.size() == 0) {
-                cout<<"all points are loss"<<endl;
-                return 0;
-            }
-            //绘制点
-            for (int i = 0; i < points_this.size(); ++i) {
-                cv::circle(fast_image, points_this[i], 3, cv::Scalar(0, 255, 0), -1, 8);//画出点
-            }
-            //drawTrace(points_prev,points_this,fast_image);
-
-        }
-
-
-        cout<<"num of points of Fast : "<<points_this.size()<<endl;
-        cv::imshow("Fast",fast_image);
-
-        //进行帧迭代
-        swap(points_this,points_prev);
-        swap(this_image,prev_image)  ;
-        num++;
-        cout<<"num of image:"<<num<<endl;
-        cv::waitKey(-1);
-    }
-    return 0;
+    return -1.0;
 }
