@@ -19,6 +19,10 @@ void reducePoints(vector<cv::Point2f> &v, vector<uchar> status)
     v.resize(j);
 }
 
+void reducePoints(std::vector<cv::Point2f> &v, int index ){
+    v.erase(v.begin() + index );
+}
+
 void minDistance(cv::Mat image, vector<cv::Point2f> &points, int minDistance,int maxCorners){
     size_t i, j, total = points.size(), ncorners = 0;
     vector<cv::Point2f> corners;
@@ -261,7 +265,7 @@ void getPoints(cv::Mat image,std::vector<cv::KeyPoint> &points,cv::InputArray ma
             points.push_back(points_temp[i]);
         }
     }
-
+    //小于0，无限制，全部加入
     if (maxConer < 0){
         for (auto kp:points_temp)
             points.push_back(kp);
@@ -269,7 +273,7 @@ void getPoints(cv::Mat image,std::vector<cv::KeyPoint> &points,cv::InputArray ma
 
 }
 
-void getPoints_grid(cv::Mat image, int grid_size,int num_point_grid, std::vector<cv::Point2f> &points){
+void getPoints_grid(cv::Mat image, int grid_size,int point_num_grid, std::vector<cv::Point2f> &points){
     int width = image.cols;
     int height = image.rows;
     int n = width / grid_size; // 一行的grid数；
@@ -278,29 +282,29 @@ void getPoints_grid(cv::Mat image, int grid_size,int num_point_grid, std::vector
     for (int i = 0; i < n; ++i) {
         for (int j = 0; j < m; ++j) {
             cv::Mat mask = cv::Mat::zeros(image.size(),CV_8UC1);
-            //每块grid检测，并选出最佳5个
+            //每块grid检测，并选出最佳point_num_grid个
             mask.colRange(grid_size*i,grid_size*(i+1)).rowRange(grid_size*j,grid_size*(j+1)).setTo(255);
-            getPoints(image,points,mask,num_point_grid);
+            getPoints(image,points,mask,point_num_grid);
         }
     }
     //grid之外的边缘区域,列边缘，行边缘
     for (int k = 0; k < n; ++k) {
         cv::Mat mask = cv::Mat::zeros(image.size(),CV_8UC1);
         mask.colRange(grid_size*k ,grid_size*(k+1)).rowRange(grid_size*m,height).setTo(255);
-        getPoints(image,points,mask,num_point_grid);
+        getPoints(image,points,mask,point_num_grid);
     }
     for (int l = 0; l < m; ++l) {
         cv::Mat mask = cv::Mat::zeros(image.size(),CV_8UC1);
         mask.colRange(grid_size*n ,width).rowRange(grid_size*l,grid_size*(l+1)).setTo(255);
-        getPoints(image,points,mask,num_point_grid);
+        getPoints(image,points,mask,point_num_grid);
     }
 
     cv::Mat mask = cv::Mat::zeros(image.size(),CV_8UC1);
     mask.colRange(grid_size*n ,width).rowRange(grid_size*m,height).setTo(255);
-    getPoints(image,points,mask,num_point_grid);
+    getPoints(image,points,mask,point_num_grid);
 }
 
-void getPoints_grid(cv::Mat image, int grid_size,int num_point_grid, vector<cv::Point2f> &points, int maxConer){
+void getPoints_grid(cv::Mat image, int grid_size,int point_num_grid, vector<cv::Point2f> &points, int maxConer){
     int width = image.cols;
     int height = image.rows;
     int n = width / grid_size; // 一行的grid数；
@@ -310,26 +314,26 @@ void getPoints_grid(cv::Mat image, int grid_size,int num_point_grid, vector<cv::
     for (int i = 0; i < n; ++i) {
         for (int j = 0; j < m; ++j) {
             cv::Mat mask = cv::Mat::zeros(image.size(),CV_8UC1);
-            //每块grid检测，并选出最佳5个
+            //每块grid检测，并选出最佳point_num_grid个
             mask.colRange(grid_size*i,grid_size*(i+1)).rowRange(grid_size*j,grid_size*(j+1)).setTo(255);
-            getPoints(image,points_temp,mask,num_point_grid);
+            getPoints(image,points_temp,mask,point_num_grid);
         }
     }
     //grid之外的边缘区域,列边缘，行边缘
     for (int k = 0; k < n; ++k) {
         cv::Mat mask = cv::Mat::zeros(image.size(),CV_8UC1);
         mask.colRange(grid_size*k ,grid_size*(k+1)).rowRange(grid_size*m,height).setTo(255);
-        getPoints(image,points_temp,mask,num_point_grid);
+        getPoints(image,points_temp,mask,point_num_grid);
     }
     for (int l = 0; l < m; ++l) {
         cv::Mat mask = cv::Mat::zeros(image.size(),CV_8UC1);
         mask.colRange(grid_size*n ,width).rowRange(grid_size*l,grid_size*(l+1)).setTo(255);
-        getPoints(image,points_temp,mask,num_point_grid);
+        getPoints(image,points_temp,mask,point_num_grid);
     }
 
     cv::Mat mask = cv::Mat::zeros(image.size(),CV_8UC1);
     mask.colRange(grid_size*n ,width).rowRange(grid_size*m,height).setTo(255);
-    getPoints(image,points_temp,mask,num_point_grid);
+    getPoints(image,points_temp,mask,point_num_grid);
 
     sort(points_temp.begin(),points_temp.end(),compare);
     if (maxConer > 0){
@@ -388,8 +392,11 @@ void drawTrace(vector<cv::Point2f> &points1,vector<cv::Point2f> &points2,cv::Mat
         }
 }
 
-double getDepth(cv::Mat image_depth,cv::Point2f point, double depth_scale){
-    double d = image_depth.at<double >(point);
+float getDepth(cv::Mat image_depth,cv::Point2f point, double depth_scale){
+    int x = round(point.x);
+    int y = round(point.y);
+
+    float d = image_depth.at<float >(point);
     if ( d!=0 )
     {
         return d / depth_scale;
@@ -401,7 +408,7 @@ double getDepth(cv::Mat image_depth,cv::Point2f point, double depth_scale){
         int dy[4] = {0,-1,0,1};
         for ( int i=0; i<4; i++ )
         {
-            d = image_depth.at<double >((point.x+dx[i] ),(point.y+dy[i]));
+            d = image_depth.at<float >((y+dy[i]),(x+dx[i] ));
             if ( d!=0 )
             {
                 return d / depth_scale;

@@ -28,3 +28,10 @@ min_inliers: 30
 keyframe_rotation: 0.1
 keyframe_translation: 0.1
 map_point_erase_ratio: 0.1
+
+#自定义的一些参数
+grid_size: 100
+points_num_grid: 5
+F_THRESHOLD: 1
+MAXCONER: 200
+MIN_DIST: 30
