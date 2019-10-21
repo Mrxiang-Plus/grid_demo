@@ -415,16 +415,22 @@ cv::Mat setmask(cv::Mat image,vector<cv::Point2f> points){
 
 
 int main(int argc, char** argv){
-    if(argc != 2){
-        cout<<"wrong input\nusage: grid path_to_dataset"<<endl;
+    if(argc != 1){
+        cout<<"wrong input\nusage: grid "<<endl;
         return 1 ;
     }
 
     //一些必要的数据
     cv::namedWindow("Fast",cv::WINDOW_AUTOSIZE);//创建一个显示窗口
 
-    string dataset_path = argv[1];
-    string dataset = dataset_path + "/file.txt";
+    cv::FileStorage fs("../config/default.yaml",cv::FileStorage::READ);
+    if (!fs.isOpened()) {
+        cout << "No file!" << endl;
+        return 1;
+    }
+
+    string dataset_dir = (string)fs["dataset_dir"];
+    string dataset = dataset_dir + "/associate.txt";
     bool isfrist = true;
     int num = 0;
     ifstream fin(dataset);//读取数据集文件
@@ -432,12 +438,14 @@ int main(int argc, char** argv){
 
     ///读取数据并进行处理
     while(true){
-        string picture_file;//存储当前图片地址
+        string rgb_time,rgb_file,depth_time,depth_file;//存储当前图片地址
 
-        fin >> picture_file;
+        fin>>rgb_time>>rgb_file>>depth_time>>depth_file;
+        rgb_file = dataset_dir + "/" + rgb_file;
+
         if (fin.eof())   break;
 
-        this_image = cv::imread(picture_file);
+        this_image = cv::imread(rgb_file);
         this_image.copyTo(fast_image);
         cv::cvtColor(this_image, this_image, cv::COLOR_BGR2GRAY);
 

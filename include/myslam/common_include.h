@@ -7,6 +7,10 @@
 #include <iostream>
 #include <fstream>
 
+//for ceres
+#include <ceres/ceres.h>
+#include <ceres/rotation.h>
+
 //for opencv
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/highgui/highgui.hpp>

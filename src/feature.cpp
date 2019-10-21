@@ -23,6 +23,15 @@ void reducePoints(std::vector<cv::Point2f> &v, int index ){
     v.erase(v.begin() + index );
 }
 
+void reducePoints(vector<int > &v, vector<uchar> status)
+{
+    int j = 0;
+    for (int i = 0; i < int(v.size()); i++)
+        if (status[i])
+            v[j++] = v[i];
+    v.resize(j);
+}
+
 void minDistance(cv::Mat image, vector<cv::Point2f> &points, int minDistance,int maxCorners){
     size_t i, j, total = points.size(), ncorners = 0;
     vector<cv::Point2f> corners;
@@ -208,7 +217,7 @@ void minDistance(cv::Mat image, vector<cv::KeyPoint> &points, int minDistance,in
 }
 
 void getPoints(cv::Mat image,std::vector<cv::Point2f> &points,cv::InputArray mask,int maxConer){
-    std::vector<cv::KeyPoint> points_Fast; //暂时存储提取的点
+    std::vector<cv::KeyPoint> points_Fast ; //暂时存储提取的点
     //Fast检测器
     cv::Ptr<cv::FastFeatureDetector> FastDetector = cv::FastFeatureDetector::create(20, true);
     FastDetector -> detect(image, points_Fast,mask);
@@ -235,9 +244,6 @@ void getPoints(cv::Mat image,std::vector<cv::Point2f> &points,cv::InputArray mas
         for (auto kp:points_temp)
             points.push_back(kp);
     }
-
-
-
 }
 
 void getPoints(cv::Mat image,std::vector<cv::KeyPoint> &points,cv::InputArray mask,int maxConer){
@@ -392,11 +398,11 @@ void drawTrace(vector<cv::Point2f> &points1,vector<cv::Point2f> &points2,cv::Mat
         }
 }
 
-float getDepth(cv::Mat image_depth,cv::Point2f point, double depth_scale){
+float getDepth(cv::Mat image_depth,cv::Point2f point, float depth_scale){
     int x = round(point.x);
     int y = round(point.y);
 
-    float d = image_depth.at<float >(point);
+    float d = image_depth.at<ushort >(point);
     if ( d!=0 )
     {
         return d / depth_scale;

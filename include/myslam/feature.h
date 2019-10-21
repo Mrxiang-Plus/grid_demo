@@ -31,9 +31,11 @@ void drawGrid(cv::Mat &image, int grid_size);
 void reducePoints(std::vector<cv::Point2f> &v, std::vector<uchar> status);
 //去除追踪失败的点,按索引，从零开始
 void reducePoints(std::vector<cv::Point2f> &v, int index );
+//去除追踪失败点的追踪次数
+void reducePoints(std::vector<int > &v, std::vector<uchar> status);
 //画出轨迹
 void drawTrace(std::vector<cv::Point2f> &points1,std::vector<cv::Point2f> &points2,cv::Mat image);
 //得到当前点的深度
-float getDepth(cv::Mat image_depth,cv::Point2f point,double depth_scale=1.0);
+float getDepth(cv::Mat image_depth,cv::Point2f point,float depth_scale=1.0);
 
 #endif //GRIDDEMO_FEATURE_H

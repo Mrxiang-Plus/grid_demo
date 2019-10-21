@@ -15,7 +15,7 @@ void getParameter(){
     fy = (double)fs["camera.fy"];
     cx = (double)fs["camera.cx"];
     cy = (double)fs["camera.cy"];
-    depth_scale = (double)fs["camera.depth_scale"];
+    depth_scale = (float)fs["camera.depth_scale"];
     dataset_dir = (string)fs["dataset_dir"];
     grid_size = (int)fs["grid_size"];
     points_num_grid = (int)fs["points_num_grid"];

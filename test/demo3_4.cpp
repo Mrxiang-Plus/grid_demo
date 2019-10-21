@@ -1,46 +1,31 @@
 //
-// Created by xiang on 2019/10/16.
+// Created by xiang on 2019/10/18.
 //
+
+
 /*
- *开启补点（vins思想）
+ *更换补点方式
+ *采用vins思想
  * fast角点
- * 光流追踪
  * 加入最小距离限制
- * 加入位姿计算,基于第一帧
- * 维护局部地图点(待完成)
+ * 结构优化
  */
+
 
 #include "myslam/camera.h"
 #include "myslam/feature.h"
 using namespace std;
 
-struct reprojectError{
-    cv::Mat K = (cv::Mat_<double >(3,3)<<
-            517.3,0,325.1,
-            0,516.5,249.7,
-            0,0,1);
-    cv::Point2f p_p;
-    cv::Point3f p_w;
-    reprojectError(cv::Point2f point_2d,cv::Point3f point_3d) : p_p(point_2d),p_w(point_3d){}
-    template <typename T>
-    bool operator()(const T* const rvec,const T* const tvec, T* residuals) const {
-        cv::Point2f p_r;
-        cv::projectPoints(p_w,rvec,tvec,K,cv::noArray(),p_r);
-        residuals[0] = p_r.x - p_w.x;
-        residuals[1] = p_r.y - p_w.y;
-
-        return true;
-    }
-};
 int main(int argc, char** argv){
     if(argc != 1){
         cout<<"wrong input\nusage: grid "<<endl;
         return 1 ;
     }
     getParameter();
+
     cout<<"fx :"<< fx<<" fy :"<<fy<<" cx : "<<cx<<" cy : "<<cy<<" depth_scale : "<<depth_scale<<endl;
     cv::Mat K = (cv::Mat_<double >(3,3)<<
-            fx,0,cx,
+                                       fx,0,cx,
             0,fy,cy,
             0,0,1);
     int image_index=0;//图像索引
@@ -54,10 +39,6 @@ int main(int argc, char** argv){
     cv::TermCriteria termCriteria(cv::TermCriteria::MAX_ITER|cv::TermCriteria::EPS,20,0.03);//停止迭代标准
 
     while (true){
-        vector<cv::Point3f> points_3d;//暂存当前帧相机坐标系下坐标
-        vector<cv::Point2f> points_reproject;//重投影的点
-        cv::Mat rvec,tvec;//旋转向量和平移向量
-        cv::Mat points_true;//PnP求解的内点
         fin>>rgb_time>>rgb_file>>depth_time>>depth_file;
         rgb_file = dataset_dir + "/" + rgb_file;
         depth_file = dataset_dir + "/" + depth_file;
@@ -86,7 +67,7 @@ int main(int argc, char** argv){
             double start_flow = cv::getTickCount();
             cv::calcOpticalFlowPyrLK(image_prev,image_this,points_prev,points_this,status_Fast,err_Fast,cv::Size(21,21),3,termCriteria,0,0.001);
             double time_flow = (cv::getTickCount() - start_flow) / cv::getTickFrequency();
-            cout << "time for flow" << time_flow<<endl;
+            cout << "time for flow : " << time_flow<<endl;
 
             reducePoints(points_this,status_Fast);
             reducePoints(points_prev,status_Fast);
@@ -96,41 +77,9 @@ int main(int argc, char** argv){
                 cout<<"all points are loss"<<endl;
                 return 0;
             }
-            //求解两帧之间位姿
-            for (int i = 0; i < points_this.size(); ++i) {
-                float depth = getDepth(depth_prev,points_prev[i],depth_scale);
-                if(depth < 0) {
-                    status_depth.push_back(0);
-                }
-                else {
-                    status_depth.push_back(1);
-                    points_3d.push_back(pixel2camera(points_prev[i],depth));
-                }
-            }
-            reducePoints(points_prev,status_depth);
-            reducePoints(points_this,status_depth);
 
-            double start_getpose = cv::getTickCount();
-            getPose(points_3d,points_this,rvec,tvec,points_true);
-            double time_getpose = (cv::getTickCount() - start_getpose) / cv::getTickFrequency();
-            cout <<"time for get pose: "<< time_getpose<<endl;
-            if(points_true.rows < min_inliers) Lost = true;//判断是否跟踪失败
-            //重投影
-            cv::projectPoints(points_3d,rvec,tvec,K,cv::noArray(),points_reproject);
-            //BA
-            ///构建寻优问题
-            ceres::Problem problem;
-            for (int i = 0; i < points_this.size(); ++i) {
-                //构建代价函数
-                ceres::CostFunction* costFunction =
-                        new ceres::AutoDiffCostFunction<reprojectError,2,1,1>
-                                (new reprojectError(points_this[i],points_3d[i]));
-                //增加残差块
-                problem.AddResidualBlock(costFunction,NULL,&rvec,&tvec);
-            }
             //补点操作
-            int num_add = MAXCONER - points_this.si
-                    ze();
+            int num_add = MAXCONER - points_this.size();
             if(num_add > 0){
                 cv::Mat mask = setmask(image_this,points_this,MIN_DIST);
                 double start_add = cv::getTickCount();
@@ -139,8 +88,6 @@ int main(int argc, char** argv){
                 cout <<"time for add point: "<< time_add<<endl;
 //                cv::imshow("mask",mask);
             }
-            points_3d.clear();//清除信息
-
         }
 
         //在当前帧上画出角点
@@ -158,4 +105,3 @@ int main(int argc, char** argv){
     }
     return 0;
 }
-
